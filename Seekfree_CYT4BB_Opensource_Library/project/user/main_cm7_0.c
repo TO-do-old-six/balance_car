@@ -17,8 +17,10 @@
 #include "../code/hmi/input/input_handler.h"
 #include <math.h>
 
-/* 手动测试开关: 标定完成后直接激活单边桥, 不依赖导航 */
-#define BRIDGE_MANUAL_TEST 1
+/* 手动测试开关: 标定完成后直接激活, 不依赖导航 */
+#define BRIDGE_MANUAL_TEST         0
+#define SINGLE_BRIDGE_MANUAL_TEST  0
+#define BUMPY_MANUAL_TEST          0
 #define BOARD_REPLAY_KEY KEY_1
 #define BOARD_ROUTE_SAVE_KEY_2 KEY_2
 #define BOARD_ROUTE_SAVE_KEY_3 KEY_3

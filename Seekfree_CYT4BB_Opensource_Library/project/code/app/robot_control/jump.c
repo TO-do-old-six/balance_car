@@ -139,7 +139,8 @@ static void run_stabilize(const Sensor_data_t *sensor,
     (void)sensor;
 
     if (g_cycle == 1) {
-        robot_control_reset_leg_speed_pid();  /* 清除正常行驶的积分, 防止带入跳跃 (含 roll PID) */
+        robot_control_reset_leg_speed_pid();   /* 清除正常行驶的积分, 防止带入跳跃 (含 roll PID) */
+        robot_control_reset_balance_pid();     /* 清除标定期间积累的平衡 PID 积分, 保证每次发车速度一致 */
     }
 
     /* 保留 leg_cmd_solve 的 X 输出, 让 g_leg_speed_pid 控制前向速度 */

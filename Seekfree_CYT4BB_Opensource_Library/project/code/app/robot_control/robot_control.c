@@ -264,7 +264,7 @@ void control_task(void){
         {
             float pitch_target = 0.0f;
 
-            if (!jump_is_active() && !jump_is_in_cooldown()) {
+            if (!jump_is_active() && !jump_is_in_cooldown() && !track_bridge_climb_is_active()) {
                 /* speed_control 已关闭 (g_speed_pid 增益均为 0), 用纯 P 刹车 */
                 float speed_norm = (sensor_local.motor_left_speed + sensor_local.motor_right_speed) / 120.0f;
 
@@ -272,7 +272,9 @@ void control_task(void){
                 bool reverse_request = (cmd_local.target_speed * speed_norm < -0.0003f);
 
                 if (stop_request || reverse_request) {
-                    pitch_target = -g_brake_p_gain * speed_norm;
+                    /* 跳跃全过程关闭刹车 P 增益 */
+                    float brake_gain = (jump_is_active() || jump_is_in_cooldown()) ? 0.0f : g_brake_p_gain;
+                    pitch_target = -brake_gain * speed_norm;
                     pitch_target = CLAMP(pitch_target, -0.25f, 0.25f);
                 }
             }
@@ -350,9 +352,9 @@ void control_task(void){
         if (jump_is_active()) {
             cmd_local.target_speed = jump_get_approach_speed();
         }
-        /* 冷却期: 目标速度清零, 原地稳住 */
+        /* 冷却期: 低速仅由 g_leg_speed_pid 驱动 */
         if (jump_is_in_cooldown()) {
-            cmd_local.target_speed = 0.3f;
+            cmd_local.target_speed = 0.2f;
         }
         /* 颠簸路段: 极慢速度 */
         if (track_bumpy_is_active()) {
