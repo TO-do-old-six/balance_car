@@ -467,7 +467,7 @@ int main(void)
     zf_log(0, "Bumpy manual test started.");
 #endif
     //jump_start(-0.27f, 3);//三级台阶
-    jump_start(-0.40f, 1);//直接跳过颠簸
+    //jump_start(-0.40f, 1);//直接跳过颠簸
 
     while(true)
     {
