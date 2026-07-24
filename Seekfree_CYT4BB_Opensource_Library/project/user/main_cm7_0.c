@@ -458,11 +458,16 @@ int main(void)
 #if BRIDGE_MANUAL_TEST
     //track_bridge_climb_activate();
     //zf_log(0, "Bridge climb manual test started.");
-#else
-    //track_rotate720_start();   // 测试旋转720
+#endif
+#if SINGLE_BRIDGE_MANUAL_TEST
+    //track_single_bridge_activate();  /* 需要 track_elements.h 中有声明 */
+#endif
+#if BUMPY_MANUAL_TEST
+    track_bumpy_activate();
+    zf_log(0, "Bumpy manual test started.");
 #endif
     //jump_start(-0.27f, 3);//三级台阶
-    //jump_start(-2.50f, 1);//直接跳过颠簸
+    //jump_start(-0.40f, 1);//直接跳过颠簸
 
     while(true)
     {

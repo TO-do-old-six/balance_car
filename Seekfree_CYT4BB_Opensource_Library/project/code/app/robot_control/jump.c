@@ -25,20 +25,11 @@ typedef enum {
 /* 前向推进 */
 #define JUMP_FORWARD_BIAS   -0.0f   /* 蹬地时脚在髋后方的偏移 (mm) */
 
-/* 单跳(count=1)专用: 起跳/落地足端 X 偏置, 0=正下方, 负=前伸 */
-#define SINGLE_LAUNCH_X_OFFSET   60.0f   /* 单跳蹬地/空中 X 偏置, 正=脚在髋前方, 从源头对抗前扑 (mm) */
-#define SINGLE_LAND_X_OFFSET    120.0f   /* 落地 X 偏置 (mm) */
-#define SINGLE_AIR_X_COMPENSATE 150.0f   /* 单跳空中惯量补偿 (mm) */
-#define SINGLE_TUCK_Y          50.0f   /* 单跳空中收腿 Y (mm), 负=更快收 */
-#define SINGLE_TUCK_RAMP_MS     30     /* 单跳收腿时长 (ms) */
-#define SINGLE_LAUNCH_KP    12000.0f   /* 单跳蹬地腿 KP */
-#define SINGLE_LAUNCH_KI       50.0f   /* 单跳蹬地腿 KI */
-
 /* 空中惯量补偿: 足端前移对抗前重后轻 (mm) */
 #define JUMP_AIR_X_COMPENSATE  80.0f
 
 /* 时序 (1kHz cycles) */
-#define STABILIZE_DURATION      1500    /* 单次起跳前自稳 1.5 秒 */
+#define STABILIZE_DURATION      1000    /* 单次起跳前自稳 1.0 秒 */
 #define MULTI_STABILIZE_DURATION 125    /* 多级跳跃时每跳自稳 300ms (台阶面积有限, 不宜太长) */
 #define JUMP23_STABILIZE_MS     100    /* 第二→第三跳之间自稳, 独立可调 */
 #define SQUAT_DURATION          400
@@ -61,7 +52,7 @@ typedef enum {
 #define ACCEL_FREEFALL_THRESHOLD 0.3f /* 自由落体判据 */
 
 /* 跳跃结束后速度环冷却期 (ms) */
-#define JUMP_COOLDOWN_MS      2000
+#define JUMP_COOLDOWN_MS      500
 
 /* 腿 PID 临时高增益 (LAUNCH 阶段减少力冲击持续时间) */
 #define LAUNCH_KP             10000.0f
@@ -184,13 +175,9 @@ static void run_squat(const Sensor_data_t *sensor,
     if (t > 1.0f) t = 1.0f;
     float dy = lerp(0.0f, JUMP_SQUAT_Y, t);
 
-    /* 单跳: 足端 X 前伸, 蹬地时产生后仰力矩抑制前扑 */
-    /* 多跳: 足端 X 居中, 避免蹲下时重心偏移 */
-    {
-        float squat_x = (g_jump_total == 1) ? SINGLE_LAUNCH_X_OFFSET : 0.0f;
-        left->x  = squat_x;
-        right->x = -squat_x;
-    }
+    /* 足端 X 居中, 避免蹲下时重心偏移 */
+    left->x  = 0.0f;
+    right->x = 0.0f;
     left->y  = g_base_y_left  + dy;
     right->y = g_base_y_right + dy;
 
@@ -210,26 +197,12 @@ static void run_launch(const Sensor_data_t *sensor,
                        Foot_position_t *left, Foot_position_t *right)
 {
     if (g_cycle == 1) {
-        if (g_jump_total == 1) {
-            /* 单跳: 起跳 X=0(正下方) + 偏置, 用专属蹬地增益 */
-            g_air_x_left  = SINGLE_LAUNCH_X_OFFSET;
-            g_air_x_right = -SINGLE_LAUNCH_X_OFFSET;
-            g_leg_left_pid.front.kp  = SINGLE_LAUNCH_KP;
-            g_leg_left_pid.front.ki  = SINGLE_LAUNCH_KI;
-            g_leg_left_pid.back.kp   = SINGLE_LAUNCH_KP;
-            g_leg_left_pid.back.ki   = SINGLE_LAUNCH_KI;
-            g_leg_right_pid.front.kp = SINGLE_LAUNCH_KP;
-            g_leg_right_pid.front.ki = SINGLE_LAUNCH_KI;
-            g_leg_right_pid.back.kp  = SINGLE_LAUNCH_KP;
-            g_leg_right_pid.back.ki  = SINGLE_LAUNCH_KI;
-        } else {
-            /* 多跳: 纯前馈基于接近速度, 不依赖 PID, 多跳一致 */
-            float ff_x = g_approach_speed * 200.0f;
-            ff_x = CLAMP(ff_x, -80.0f, 80.0f);
-            g_air_x_left  = ff_x;
-            g_air_x_right = -ff_x;
-            leg_pid_set_launch_gains();
-        }
+        /* 纯前馈基于接近速度, 不依赖 PID, 多跳一致 */
+        float ff_x = g_approach_speed * 200.0f;
+        ff_x = CLAMP(ff_x, -80.0f, 80.0f);
+        g_air_x_left  = ff_x;
+        g_air_x_right = -ff_x;
+        leg_pid_set_launch_gains();
     }
 
     /* 腿 Y: 50ms 渐变, 基线 + 蹬地偏移 */
@@ -237,21 +210,14 @@ static void run_launch(const Sensor_data_t *sensor,
     if (ramp_t > 1.0f) ramp_t = 1.0f;
     float dy = lerp(JUMP_SQUAT_Y, JUMP_PUSH_Y, ramp_t);
 
-    /* 单跳: 脚保持在髋前方蹬地, 地面反力产生后仰力矩 */
-    /* 多跳: 仅叠加 JUMP_FORWARD_BIAS */
-    if (g_jump_total == 1) {
-        left->x  = SINGLE_LAUNCH_X_OFFSET;
-        right->x = -SINGLE_LAUNCH_X_OFFSET;
-    } else {
-        left->x  += JUMP_FORWARD_BIAS;
-        right->x -= JUMP_FORWARD_BIAS;
-    }
+    left->x   = JUMP_FORWARD_BIAS;
+    right->x  = -JUMP_FORWARD_BIAS;
     left->y  = g_base_y_left  + dy;
     right->y = g_base_y_right + dy;
 
     /* 离地检测: 单跳蹬地渐变结束后即启用, 防止腿在空中过度伸展 */
     bool airborne = false;
-    uint16_t freefall_delay = (g_jump_total == 1) ? LAUNCH_RAMP_MS : 80;
+    uint16_t freefall_delay = 80;
     if (g_cycle > freefall_delay) {
         airborne = (fabsf(sensor->accel_z) < ACCEL_FREEFALL_THRESHOLD);
     }
@@ -274,8 +240,8 @@ static void run_air(const Sensor_data_t *sensor,
                     Foot_position_t *left, Foot_position_t *right)
 {
     float y;
-    float tuck_target = (g_jump_total == 1) ? SINGLE_TUCK_Y : JUMP_TUCK_Y;
-    uint16_t tuck_ms  = (g_jump_total == 1) ? SINGLE_TUCK_RAMP_MS : TUCK_RAMP_MS;
+    float tuck_target = JUMP_TUCK_Y;
+    uint16_t tuck_ms  = TUCK_RAMP_MS;
     uint16_t reach_ms = REACH_RAMP_MS;
 
     if (g_cycle < tuck_ms) {
@@ -292,7 +258,7 @@ static void run_air(const Sensor_data_t *sensor,
         y = JUMP_REACH_Y;
     }
 
-    float air_compensate = (g_jump_total == 1) ? SINGLE_AIR_X_COMPENSATE : JUMP_AIR_X_COMPENSATE;
+    float air_compensate = JUMP_AIR_X_COMPENSATE;
     left->x  = g_air_x_left  + air_compensate;
     right->x = g_air_x_right - air_compensate;
     left->y  = y;
@@ -356,9 +322,9 @@ static void run_land(const Sensor_data_t *sensor,
             }
         }
     } else {
-        /* 落地 X: 单跳用 SINGLE_LAND_X_OFFSET, 多跳用固定 -50 */
+        /* 落地 X: 固定 -50 */
         {
-            float land_x = (g_jump_total == 1) ? SINGLE_LAND_X_OFFSET : -50.0f;
+            float land_x = -50.0f;
             left->x  = land_x;
             right->x = -land_x;
         }

@@ -30,6 +30,10 @@ extern PID_Controller_t g_yaw_pid;
 extern Leg_PID_t g_leg_left_pid;
 extern Leg_PID_t g_leg_right_pid;
 
+/* 腿速度/横滚 PID (track_elements 颠簸路段需要切增益) */
+extern PID_Controller_t g_leg_speed_pid;
+extern PID_Controller_t g_leg_roll_pid;
+
 void robot_control_init(void);
 
 void sensor_update(const Sensor_data_t *sensor);
@@ -63,5 +67,8 @@ float robot_control_get_theta(void);
 float robot_control_get_distance(void);
 float robot_control_get_yaw(void);
 float robot_control_get_speed_mps(void);
+
+/* 跳跃+下坡元素完成信号: 下坡保护结束时置 true, 导航读取后自行清零 */
+extern bool g_jump_element_done;
 
 #endif /* ROBOT_CONTROL_H */
