@@ -44,6 +44,14 @@
 #define NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS    0.08f  /* 旋转点硬刹释放速度(m/s)；调大更早结束硬刹 */
 #define NAV_RECORD_ROTATE_TRIGGER_SPEED_MPS    0.08f  /* 允许触发旋转动作的最高速度(m/s)；调大可不必完全停稳 */
 #define NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M   0.05f  /* 允许触发旋转动作的距离(m)；调大更早执行旋转 */
+#define NAV_RECORD_ROTATE_OSC_DISTANCE_M       0.12f  /* 旋转点附近震荡检测半径(m)；超过该范围不触发兜底 */
+#define NAV_RECORD_ROTATE_OSC_RESET_DISTANCE_M 0.22f  /* 离开该范围后重置震荡检测(m) */
+#define NAV_RECORD_ROTATE_OSC_PROGRESS_EPS_M   0.008f /* 小于该改善量视为未继续靠近(m) */
+#define NAV_RECORD_ROTATE_OSC_ALONG_EPS_M      0.015f /* 沿路径穿越目标点的死区(m) */
+#define NAV_RECORD_ROTATE_OSC_MIN_TIME_MS      700u   /* 至少在近点区停留多久才允许兜底触发(ms) */
+#define NAV_RECORD_ROTATE_OSC_STALL_TIME_MS    450u   /* 近点区多久没有明显靠近视为卡住(ms) */
+#define NAV_RECORD_ROTATE_OSC_CROSS_COUNT      2u     /* 沿目标点前后切换次数达到该值视为震荡 */
+#define NAV_RECORD_ROTATE_OSC_MAX_SPEED_MPS    0.20f  /* 兜底触发允许的最高速度(m/s) */
 
 static Nav_Keypoint_t g_record_keypoints[NAV_RECORD_MAX_KEYPOINTS];
 static Nav_Route_Record_State_t g_record_state;
@@ -63,12 +71,31 @@ static float g_replay_final_brake_yaw;
 static uint8 g_replay_brake_segment_index;
 static bool g_replay_segment_brake_active;
 static bool g_replay_segment_brake_done;
+static uint8 g_replay_rotate_osc_index;
+static bool g_replay_rotate_osc_active;
+static uint32 g_replay_rotate_osc_start_time;
+static uint32 g_replay_rotate_osc_progress_time;
+static float g_replay_rotate_osc_best_distance;
+static int8 g_replay_rotate_osc_last_sign;
+static uint8 g_replay_rotate_osc_cross_count;
+
+static void replay_reset_rotate_oscillation(void)
+{
+    g_replay_rotate_osc_index = 0u;
+    g_replay_rotate_osc_active = false;
+    g_replay_rotate_osc_start_time = 0u;
+    g_replay_rotate_osc_progress_time = 0u;
+    g_replay_rotate_osc_best_distance = 0.0f;
+    g_replay_rotate_osc_last_sign = 0;
+    g_replay_rotate_osc_cross_count = 0u;
+}
 
 static void replay_reset_segment_brake(void)
 {
     g_replay_brake_segment_index = g_record_state.replay_index;
     g_replay_segment_brake_active = false;
     g_replay_segment_brake_done = false;
+    replay_reset_rotate_oscillation();
 }
 
 static void replay_sync_segment_brake(void)
@@ -395,6 +422,85 @@ static bool replay_apply_rotate_prebrake(Nav_Output_t *out,
     return false;
 }
 
+static int8 replay_rotate_along_sign(float along_remaining)
+{
+    if (along_remaining > NAV_RECORD_ROTATE_OSC_ALONG_EPS_M) {
+        return 1;
+    }
+
+    if (along_remaining < -NAV_RECORD_ROTATE_OSC_ALONG_EPS_M) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static bool replay_rotate_oscillation_ready(const Nav_Input_t *input,
+                                            uint8 target_index,
+                                            float target_distance,
+                                            float along_remaining)
+{
+    uint32 near_elapsed_ms;
+    uint32 stall_elapsed_ms;
+    int8 along_sign;
+
+    if (input == NULL) {
+        return false;
+    }
+
+    if (target_distance > NAV_RECORD_ROTATE_OSC_RESET_DISTANCE_M) {
+        replay_reset_rotate_oscillation();
+        return false;
+    }
+
+    if (target_distance > NAV_RECORD_ROTATE_OSC_DISTANCE_M) {
+        return false;
+    }
+
+    along_sign = replay_rotate_along_sign(along_remaining);
+    if (!g_replay_rotate_osc_active ||
+        g_replay_rotate_osc_index != target_index) {
+        g_replay_rotate_osc_index = target_index;
+        g_replay_rotate_osc_active = true;
+        g_replay_rotate_osc_start_time = input->time_ms;
+        g_replay_rotate_osc_progress_time = input->time_ms;
+        g_replay_rotate_osc_best_distance = target_distance;
+        g_replay_rotate_osc_last_sign = along_sign;
+        g_replay_rotate_osc_cross_count = 0u;
+        return false;
+    }
+
+    if (target_distance + NAV_RECORD_ROTATE_OSC_PROGRESS_EPS_M <
+        g_replay_rotate_osc_best_distance) {
+        g_replay_rotate_osc_best_distance = target_distance;
+        g_replay_rotate_osc_progress_time = input->time_ms;
+        g_replay_rotate_osc_cross_count = 0u;
+    }
+
+    if (along_sign != 0) {
+        if (g_replay_rotate_osc_last_sign != 0 &&
+            along_sign != g_replay_rotate_osc_last_sign &&
+            g_replay_rotate_osc_cross_count < 255u) {
+            g_replay_rotate_osc_cross_count++;
+        }
+        g_replay_rotate_osc_last_sign = along_sign;
+    }
+
+    near_elapsed_ms = input->time_ms - g_replay_rotate_osc_start_time;
+    if (near_elapsed_ms < NAV_RECORD_ROTATE_OSC_MIN_TIME_MS) {
+        return false;
+    }
+
+    if (fabsf(input->speed_mps) > NAV_RECORD_ROTATE_OSC_MAX_SPEED_MPS) {
+        return false;
+    }
+
+    stall_elapsed_ms = input->time_ms - g_replay_rotate_osc_progress_time;
+    return (stall_elapsed_ms >= NAV_RECORD_ROTATE_OSC_STALL_TIME_MS ||
+            g_replay_rotate_osc_cross_count >=
+            NAV_RECORD_ROTATE_OSC_CROSS_COUNT);
+}
+
 static float replay_upcoming_turn_angle(uint8 target_index,
                                         float segment_yaw)
 {
@@ -536,6 +642,7 @@ void nav_route_record_notify_navigation_stopped(bool finished,
         (finished || safety_stop)) {
         g_record_state.mode = g_record_state.route_ready ?
             NAV_ROUTE_READY : NAV_ROUTE_IDLE;
+        replay_reset_rotate_oscillation();
     }
 }
 
@@ -815,6 +922,7 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
         bool waypoint_position_ready;
         bool rotate_point;
         bool rotate_trigger_ready;
+        bool rotate_oscillation_ready;
         bool final_waypoint;
 
         replay_sync_segment_brake();
@@ -885,11 +993,19 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
             rotate_point &&
             target_distance <= NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M &&
             fabsf(input->speed_mps) <= NAV_RECORD_ROTATE_TRIGGER_SPEED_MPS;
+        rotate_oscillation_ready =
+            rotate_point &&
+            !rotate_trigger_ready &&
+            replay_rotate_oscillation_ready(input,
+                                            cur_index,
+                                            target_distance,
+                                            along_remaining);
 
         if (rotate_point &&
             (target_distance <= NAV_RECORD_ROTATE_CRAWL_DISTANCE_M ||
              passed_waypoint) &&
-            !rotate_trigger_ready) {
+            !rotate_trigger_ready &&
+            !rotate_oscillation_ready) {
             if (g_replay_segment_brake_active &&
                 fabsf(input->speed_mps) <=
                 NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS) {
@@ -921,7 +1037,9 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
         }
 
         if (final_waypoint &&
-            (rotate_point ? rotate_trigger_ready : waypoint_position_ready)) {
+            (rotate_point ?
+             (rotate_trigger_ready || rotate_oscillation_ready) :
+             waypoint_position_ready)) {
             Nav_Output_t brake_out;
             if (rotate_point) {
                 return replay_rotate_action_brake_update(input, cur_index);
@@ -938,7 +1056,9 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
         }
 
         if (!final_waypoint &&
-            (rotate_point ? rotate_trigger_ready : waypoint_position_ready)) {
+            (rotate_point ?
+             (rotate_trigger_ready || rotate_oscillation_ready) :
+             waypoint_position_ready)) {
             if (rotate_point) {
                 return replay_rotate_action_brake_update(input, cur_index);
             }
