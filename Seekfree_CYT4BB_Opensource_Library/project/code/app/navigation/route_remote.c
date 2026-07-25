@@ -6,8 +6,8 @@
 /*
  * key[2]: add record point;
  * key[3]: cycle next record point action:
- *         NONE -> ROTATE720 -> STEP_START -> STEP_END -> BUMPY_START
- *         -> BUMPY_END -> NONE.
+ *         NONE -> ROTATE720 -> SLOW_DOWN -> STEP_START -> STEP_END
+ *         -> BUMPY_START -> BUMPY_END -> NONE.
  * switch_key[2]: replay;
  * switch_key[3]: record mode.
  */
@@ -31,6 +31,8 @@ static Nav_Route_Point_Action_t route_next_action(
     case NAV_ROUTE_POINT_ACTION_NONE:
         return NAV_ROUTE_POINT_ACTION_ROTATE720;
     case NAV_ROUTE_POINT_ACTION_ROTATE720:
+        return NAV_ROUTE_POINT_ACTION_SLOW_DOWN;
+    case NAV_ROUTE_POINT_ACTION_SLOW_DOWN:
         return NAV_ROUTE_POINT_ACTION_STEP_START;
     case NAV_ROUTE_POINT_ACTION_STEP_START:
         return NAV_ROUTE_POINT_ACTION_STEP_END;
@@ -51,6 +53,8 @@ static Beep_Pattern_t route_action_beep(Nav_Route_Point_Action_t action)
         return BEEP_SHORT;
     case NAV_ROUTE_POINT_ACTION_ROTATE720:
         return BEEP_DOUBLE;
+    case NAV_ROUTE_POINT_ACTION_SLOW_DOWN:
+        return BEEP_TRIPLE;
     case NAV_ROUTE_POINT_ACTION_STEP_START:
         return BEEP_TRIPLE;
     case NAV_ROUTE_POINT_ACTION_STEP_END:
