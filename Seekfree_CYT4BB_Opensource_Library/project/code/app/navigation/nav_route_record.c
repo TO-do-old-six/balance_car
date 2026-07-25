@@ -8,7 +8,7 @@
 #include "../../common/utils.h"
 #include "../../hmi/indicator/led_buzzer.h"
 
-#define NAV_RECORD_STRAIGHT_SPEED  (-0.15f)  /* 正常回放速度；绝对值越大直线路段越快 */
+#define NAV_RECORD_STRAIGHT_SPEED  (-0.3f)  /* 正常回放速度；绝对值越大直线路段越快 */
 #define NAV_RECORD_CORNER_SPEED    (-0.18f) /* 航向误差较大时的低速；调小绝对值可更稳过弯 */
 #define NAV_RECORD_TURN_SPEED      0.0f     /* 大角度偏航时的速度；0 表示先停住再修正航向 */
 #define NAV_RECORD_WAYPOINT_REACHED_M          0.03f  /* 普通路径点到达半径(m)；调大更容易切到下一点 */
@@ -31,16 +31,14 @@
 #define NAV_RECORD_TURN_PREBRAKE_SPEED         (-0.06f) /* 普通过弯预减速目标速度；绝对值越小弯前越慢 */
 #define NAV_RECORD_ROTATE_WAYPOINT_REACHED_M   0.01f  /* 旋转点到达半径(m)；调大更早进入旋转动作 */
 #define NAV_RECORD_ROTATE_BRAKE_DECEL_MPS2     0.80f  /* 旋转点制动距离估算减速度(m/s^2)；调大预估制动距离更短 */
-#define NAV_RECORD_ROTATE_BRAKE_MARGIN_M       0.20f  /* 旋转点额外制动余量(m)；调大更早进入轻刹 */
+#define NAV_RECORD_ROTATE_BRAKE_MARGIN_M       0.55f  /* 旋转点额外制动余量(m)；调大更早刹到旋转点 */
 #define NAV_RECORD_ROTATE_PREBRAKE_MIN_SEGMENT_M 0.05f /* 启用旋转点预制动的最短路段(m)；调小更容易触发 */
-#define NAV_RECORD_ROTATE_APPROACH_DISTANCE_M  0.90f  /* 旋转点前限速开始距离(m)；调大更早降为低速 */
-#define NAV_RECORD_ROTATE_APPROACH_SPEED       (-0.08f) /* 旋转点前低速靠近速度；绝对值越小越稳 */
-#define NAV_RECORD_ROTATE_PREBRAKE_DISTANCE_M  0.55f  /* 旋转点渐进减速开始距离(m)；调大更早慢下来 */
-#define NAV_RECORD_ROTATE_CRAWL_DISTANCE_M     0.25f  /* 旋转点爬行距离(m)；调大更早进入低速靠近 */
-#define NAV_RECORD_ROTATE_HARD_BRAKE_DISTANCE_M 0.06f /* 旋转点硬刹触发距离(m)；调大更早强制刹停 */
+#define NAV_RECORD_ROTATE_PREBRAKE_DISTANCE_M  0.30f  /* 旋转点渐进减速开始距离(m)；调大更早慢下来 */
+#define NAV_RECORD_ROTATE_CRAWL_DISTANCE_M     0.15f  /* 旋转点爬行距离(m)；调大更早进入低速靠近 */
+#define NAV_RECORD_ROTATE_HARD_BRAKE_DISTANCE_M 0.035f /* 旋转点硬刹触发距离(m)；调大更早强制刹停 */
 #define NAV_RECORD_ROTATE_CRAWL_SPEED          (-0.04f) /* 旋转点爬行速度；绝对值越小靠点越慢 */
 #define NAV_RECORD_ROTATE_PASS_CROSSTRACK_M    0.015f /* 越过旋转点允许的横向误差(m)；调大更容易判定已越过 */
-#define NAV_RECORD_ROTATE_HARD_BRAKE_SPEED     0.10f  /* 旋转点硬刹速度指令；0.10 附近更不易打滑 */
+#define NAV_RECORD_ROTATE_HARD_BRAKE_SPEED     0.40f  /* 旋转点硬刹速度指令；调大刹停更快 */
 #define NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS    0.08f  /* 旋转点硬刹释放速度(m/s)；调大更早结束硬刹 */
 #define NAV_RECORD_ROTATE_TRIGGER_SPEED_MPS    0.08f  /* 允许触发旋转动作的最高速度(m/s)；调大可不必完全停稳 */
 #define NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M   0.05f  /* 允许触发旋转动作的距离(m)；调大更早执行旋转 */
@@ -353,13 +351,13 @@ static bool replay_apply_rotate_prebrake(Nav_Output_t *out,
     }
 
     if (segment_distance >= NAV_RECORD_ROTATE_PREBRAKE_MIN_SEGMENT_M &&
-        target_distance < NAV_RECORD_ROTATE_APPROACH_DISTANCE_M) {
+        target_distance < NAV_RECORD_TURN_PREBRAKE_LOOKAHEAD_M) {
         ratio = 1.0f -
-            clamp(target_distance / NAV_RECORD_ROTATE_APPROACH_DISTANCE_M,
+            clamp(target_distance / NAV_RECORD_TURN_PREBRAKE_LOOKAHEAD_M,
                   0.0f,
                   1.0f);
 
-        out->velocity_cmd += (NAV_RECORD_ROTATE_APPROACH_SPEED -
+        out->velocity_cmd += (NAV_RECORD_TURN_PREBRAKE_SPEED -
                               out->velocity_cmd) * ratio;
     }
 
@@ -890,24 +888,7 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
             (target_distance <= NAV_RECORD_ROTATE_CRAWL_DISTANCE_M ||
              passed_waypoint) &&
             !rotate_trigger_ready) {
-            if (g_replay_segment_brake_active &&
-                fabsf(input->speed_mps) <=
-                NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS) {
-                g_replay_segment_brake_active = false;
-                g_replay_segment_brake_done = true;
-            }
-
-            if (fabsf(input->speed_mps) >
-                NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS &&
-                (target_distance <=
-                 replay_rotate_brake_distance(input->speed_mps) ||
-                 target_distance <=
-                 NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M ||
-                 passed_waypoint)) {
-                g_replay_segment_brake_active = true;
-                out.velocity_cmd = NAV_RECORD_ROTATE_HARD_BRAKE_SPEED;
-            } else if (target_distance <=
-                       NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M) {
+            if (target_distance <= NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M) {
                 out.velocity_cmd = 0.0f;
             } else {
                 out.velocity_cmd = (along_remaining >= 0.0f) ?
