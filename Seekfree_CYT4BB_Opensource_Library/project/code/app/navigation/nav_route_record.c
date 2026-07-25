@@ -20,16 +20,16 @@
 #define NAV_RECORD_CROSSTRACK_LIMIT_RAD        (20.0f * NAV_DEG_TO_RAD) /* 横向纠偏最大航向角(rad)；调大允许更猛回线 */
 #define NAV_RECORD_SLOW_YAW_ERROR_RAD          (10.0f * NAV_DEG_TO_RAD) /* 超过该航向误差后降到过弯速度(rad)；调小会更早减速 */
 #define NAV_RECORD_TURN_IN_PLACE_YAW_RAD       (25.0f * NAV_DEG_TO_RAD) /* 超过该航向误差后停车修正(rad)；调小会更早停下修正 */
-#define NAV_RECORD_TURN_BRAKE_RELEASE_MPS      0.18f  /* 普通过弯强制制动释放速度(m/s)；调大更早退出制动 */
-#define NAV_RECORD_TURN_BRAKE_SPEED            0.18f  /* 普通过弯强制制动指令；调大减速更猛 */
+#define NAV_RECORD_TURN_BRAKE_RELEASE_MPS      0.08f  /* 普通过弯强制制动释放速度(m/s)；调大更早退出制动 */
+#define NAV_RECORD_TURN_BRAKE_SPEED            0.40f  /* 普通过弯强制制动指令；调大减速更猛 */
 #define NAV_RECORD_TURN_BRAKE_DECEL_MPS2       0.80f  /* 普通过弯制动距离估算减速度(m/s^2)；调大预估制动距离更短 */
-#define NAV_RECORD_TURN_BRAKE_MARGIN_M         0.18f  /* 普通过弯额外制动余量(m)；调大更早刹车 */
+#define NAV_RECORD_TURN_BRAKE_MARGIN_M         0.65f  /* 普通过弯额外制动余量(m)；调大更早刹车 */
 #define NAV_RECORD_TURN_BRAKE_MAX_LOOKAHEAD_M  1.00f  /* 普通过弯最大预瞄制动距离(m)；限制最早刹车点 */
 #define NAV_RECORD_TURN_PREBRAKE_LOOKAHEAD_M   1.00f  /* 普通过弯渐进减速预瞄距离(m)；调大更早开始降速 */
-#define NAV_RECORD_TURN_PREBRAKE_MIN_SEGMENT_M 0.20f  /* 启用普通过弯预减速的最短路段(m)；调小短段也会提前减速 */
+#define NAV_RECORD_TURN_PREBRAKE_MIN_SEGMENT_M 0.05f  /* 启用普通过弯预减速的最短路段(m)；调小短段也会提前减速 */
 #define NAV_RECORD_TURN_PREBRAKE_YAW_RAD       (30.0f * NAV_DEG_TO_RAD) /* 判定为大弯的夹角阈值(rad)；调小更多弯会触发预减速 */
 #define NAV_RECORD_TURN_PREBRAKE_SPEED         (-0.05f) /* 普通过弯预减速目标速度；绝对值越小弯前越慢 */
-#define NAV_RECORD_TURN_CRAWL_DISTANCE_M       0.25f  /* 普通转向点低速找点距离(m)；进入后保持低速到点 */
+#define NAV_RECORD_TURN_CRAWL_DISTANCE_M       0.80f  /* 普通转向点低速找点距离(m)；进入后保持低速到点 */
 #define NAV_RECORD_TURN_CRAWL_SPEED            (-0.04f) /* 普通转向点低速找点速度；负数为继续前进 */
 #define NAV_RECORD_TURN_TRIGGER_SPEED_MPS      0.12f  /* 普通转向点允许切到下一段的最高速度(m/s) */
 #define NAV_RECORD_TURN_TRIGGER_DISTANCE_M     0.05f  /* 普通转向点允许切到下一段的距离(m) */
@@ -1010,8 +1010,9 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
             (target_distance <= NAV_RECORD_TURN_CRAWL_DISTANCE_M ||
              passed_waypoint) &&
             !turn_trigger_ready) {
-            if (target_distance <= NAV_RECORD_TURN_TRIGGER_DISTANCE_M) {
-                out.velocity_cmd = 0.0f;
+            if (target_distance <= NAV_RECORD_TURN_TRIGGER_DISTANCE_M ||
+                passed_waypoint) {
+                out.velocity_cmd = NAV_RECORD_TURN_BRAKE_SPEED;
             } else {
                 out.velocity_cmd = (along_remaining >= 0.0f) ?
                     NAV_RECORD_TURN_CRAWL_SPEED :
