@@ -34,9 +34,10 @@
 #define NAV_RECORD_ROTATE_BRAKE_MARGIN_M       0.65f  /* 旋转点额外制动余量(m)；调大更早刹到旋转点 */
 #define NAV_RECORD_ROTATE_PREBRAKE_MIN_SEGMENT_M 0.05f /* 启用旋转点预制动的最短路段(m)；调小更容易触发 */
 #define NAV_RECORD_ROTATE_PREBRAKE_DISTANCE_M  0.80f  /* 旋转点渐进减速开始距离(m)；调大更早慢下来 */
+#define NAV_RECORD_ROTATE_PREBRAKE_SPEED       0.01f  /* 旋转点预减速目标速度；正号表示向后慢退 */
 #define NAV_RECORD_ROTATE_CRAWL_DISTANCE_M     0.00f  /* 旋转点爬行距离(m)；调大更早进入低速靠近 */
 #define NAV_RECORD_ROTATE_HARD_BRAKE_DISTANCE_M 0.035f /* 旋转点硬刹触发距离(m)；调大更早强制刹停 */
-#define NAV_RECORD_ROTATE_CRAWL_SPEED          (-0.05f) /* 旋转点爬行速度；绝对值越小靠点越慢 */
+#define NAV_RECORD_ROTATE_CRAWL_SPEED          0.01f  /* 旋转点爬行速度；正号表示向后慢退 */
 #define NAV_RECORD_ROTATE_PASS_CROSSTRACK_M    0.015f /* 越过旋转点允许的横向误差(m)；调大更容易判定已越过 */
 #define NAV_RECORD_ROTATE_HARD_BRAKE_SPEED     0.40f  /* 旋转点硬刹速度指令；调大刹停更快 */
 #define NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS    0.08f  /* 旋转点硬刹释放速度(m/s)；调大更早结束硬刹 */
@@ -357,7 +358,7 @@ static bool replay_apply_rotate_prebrake(Nav_Output_t *out,
                   0.0f,
                   1.0f);
 
-        out->velocity_cmd += (NAV_RECORD_TURN_PREBRAKE_SPEED -
+        out->velocity_cmd += (NAV_RECORD_ROTATE_PREBRAKE_SPEED -
                               out->velocity_cmd) * ratio;
     }
 
@@ -892,8 +893,8 @@ Nav_Output_t nav_route_replay_update(const Nav_Input_t *input)
                 out.velocity_cmd = 0.0f;
             } else {
                 out.velocity_cmd = (along_remaining >= 0.0f) ?
-                    NAV_RECORD_ROTATE_CRAWL_SPEED :
-                    -NAV_RECORD_ROTATE_CRAWL_SPEED;
+                    -NAV_RECORD_ROTATE_CRAWL_SPEED :
+                    NAV_RECORD_ROTATE_CRAWL_SPEED;
             }
             out.target_yaw_valid = true;
             out.target_yaw_rad = replay_body_yaw_from_path_yaw(segment_yaw);
