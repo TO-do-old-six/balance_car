@@ -30,7 +30,7 @@
 #define NAV_RECORD_TURN_PREBRAKE_YAW_RAD       (30.0f * NAV_DEG_TO_RAD) /* 判定为大弯的夹角阈值(rad)；调小更多弯会触发预减速 */
 #define NAV_RECORD_TURN_PREBRAKE_SPEED         (-0.05f) /* 普通过弯预减速目标速度；绝对值越小弯前越慢 */
 #define NAV_RECORD_TURN_CRAWL_DISTANCE_M       0.25f  /* 普通转向点低速找点距离(m)；进入后保持低速到点 */
-#define NAV_RECORD_TURN_CRAWL_SPEED            (-0.05f) /* 普通转向点低速找点速度；负数为继续前进 */
+#define NAV_RECORD_TURN_CRAWL_SPEED            (-0.04f) /* 普通转向点低速找点速度；负数为继续前进 */
 #define NAV_RECORD_TURN_TRIGGER_SPEED_MPS      0.12f  /* 普通转向点允许切到下一段的最高速度(m/s) */
 #define NAV_RECORD_TURN_TRIGGER_DISTANCE_M     0.05f  /* 普通转向点允许切到下一段的距离(m) */
 #define NAV_RECORD_ROTATE_WAYPOINT_REACHED_M   0.01f  /* 旋转点到达半径(m)；调大更早进入旋转动作 */
