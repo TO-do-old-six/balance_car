@@ -51,7 +51,7 @@ float robot_control_get_speed_mps(void)
  */
 #define USE_VMC 0
 #define REMOTE_STEER_GAIN_RAD 6.00f
-#define CMD_VELOCITY_ACCEL_RATE 8.0f
+#define CMD_VELOCITY_ACCEL_RATE 2.5f
 #define CMD_VELOCITY_DECEL_RATE 14.0f
 #define CMD_VELOCITY_BRAKE_RATE 30.0f
 #define CMD_VELOCITY_STOP_EPS   0.002f
