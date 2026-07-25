@@ -31,16 +31,16 @@
 #define NAV_RECORD_TURN_PREBRAKE_SPEED         (-0.06f) /* 普通过弯预减速目标速度；绝对值越小弯前越慢 */
 #define NAV_RECORD_ROTATE_WAYPOINT_REACHED_M   0.01f  /* 旋转点到达半径(m)；调大更早进入旋转动作 */
 #define NAV_RECORD_ROTATE_BRAKE_DECEL_MPS2     0.80f  /* 旋转点制动距离估算减速度(m/s^2)；调大预估制动距离更短 */
-#define NAV_RECORD_ROTATE_BRAKE_MARGIN_M       0.55f  /* 旋转点额外制动余量(m)；调大更早刹到旋转点 */
+#define NAV_RECORD_ROTATE_BRAKE_MARGIN_M       0.65f  /* 旋转点额外制动余量(m)；调大更早刹到旋转点 */
 #define NAV_RECORD_ROTATE_PREBRAKE_MIN_SEGMENT_M 0.05f /* 启用旋转点预制动的最短路段(m)；调小更容易触发 */
-#define NAV_RECORD_ROTATE_PREBRAKE_DISTANCE_M  0.70f  /* 旋转点渐进减速开始距离(m)；调大更早慢下来 */
-#define NAV_RECORD_ROTATE_CRAWL_DISTANCE_M     0.05f  /* 旋转点爬行距离(m)；调大更早进入低速靠近 */
+#define NAV_RECORD_ROTATE_PREBRAKE_DISTANCE_M  0.80f  /* 旋转点渐进减速开始距离(m)；调大更早慢下来 */
+#define NAV_RECORD_ROTATE_CRAWL_DISTANCE_M     0.00f  /* 旋转点爬行距离(m)；调大更早进入低速靠近 */
 #define NAV_RECORD_ROTATE_HARD_BRAKE_DISTANCE_M 0.035f /* 旋转点硬刹触发距离(m)；调大更早强制刹停 */
 #define NAV_RECORD_ROTATE_CRAWL_SPEED          (-0.05f) /* 旋转点爬行速度；绝对值越小靠点越慢 */
 #define NAV_RECORD_ROTATE_PASS_CROSSTRACK_M    0.015f /* 越过旋转点允许的横向误差(m)；调大更容易判定已越过 */
 #define NAV_RECORD_ROTATE_HARD_BRAKE_SPEED     0.40f  /* 旋转点硬刹速度指令；调大刹停更快 */
 #define NAV_RECORD_ROTATE_BRAKE_RELEASE_MPS    0.08f  /* 旋转点硬刹释放速度(m/s)；调大更早结束硬刹 */
-#define NAV_RECORD_ROTATE_TRIGGER_SPEED_MPS    0.10f  /* 允许触发旋转动作的最高速度(m/s)；调大可不必完全停稳 */
+#define NAV_RECORD_ROTATE_TRIGGER_SPEED_MPS    0.12f  /* 允许触发旋转动作的最高速度(m/s)；调大可不必完全停稳 */
 #define NAV_RECORD_ROTATE_TRIGGER_DISTANCE_M   0.05f  /* 允许触发旋转动作的距离(m)；调大更早执行旋转 */
 
 static Nav_Keypoint_t g_record_keypoints[NAV_RECORD_MAX_KEYPOINTS];
